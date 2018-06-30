@@ -1,0 +1,71 @@
+version: '2'
+services:
+  ngrok:
+    image: fnichol/ngrok
+    entrypoint: ngrok
+
+  node:
+    image: timbru31/node-alpine-git
+    volumes:
+      - .:/usr/src/app:z
+    working_dir: /usr/src/app
+
+  yarn:
+    extends:
+      service: node
+    entrypoint: yarn
+
+  unit-test:
+    extends:
+      service: yarn
+    command: run test:unit
+
+  component-test:
+    extends:
+      service: yarn
+    command: run test:component
+    depends_on:
+      - stubs
+    environment:
+      - BASE_PATH=/
+      - PORT=80
+      - LAMBDA_FUNCTION_ID=exec
+      - GITHUB_API_BASE_URI=http://stubs/github-api
+      - GITHUB_API_AUTH_TOKEN=token
+      - GITHUB_API_USER_AGENT=FrescoDev
+      - GITHUB_API_USER_EMAIL=frescodevmgmt@gmail.com
+
+  dev:
+    extends:
+      service: yarn
+    depends_on:
+      - stubs
+    ports:
+      - "3000:80"
+    command: run dev
+    environment:
+      - BASE_PATH=/
+      - PORT=80
+      - LAMBDA_FUNCTION_ID=exec
+      - GITHUB_API_BASE_URI=http://stubs/github-api
+      - GITHUB_API_AUTH_TOKEN=token
+      - GITHUB_API_USER_AGENT=FrescoDev
+      - GITHUB_API_USER_EMAIL=frescodevmgmt@gmail.com
+
+  publish-local:
+    image: fnichol/ngrok
+    links:
+      - dev:http
+    ports:
+      - "3009:4040"
+    environment:
+      - HTTP_PORT=3000
+
+  stubs:
+    extends:
+      service: yarn
+    command: run test:stubs -- 80
+    labels:
+      - "traefik.backend=stubs"
+      - "traefik.frontend.rule=PathPrefixStrip:/stubs"
+      - "traefik.port=80"
